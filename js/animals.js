@@ -15,6 +15,41 @@ function startVideoStream() {
         video.srcObject = stream;
     });
 }
+function requestMotionPermission() {
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+        DeviceMotionEvent.requestPermission()
+            .then(permissionState => {
+                if (permissionState === 'granted') {
+                    window.addEventListener('devicemotion', handleDeviceMotion);
+                    window.addEventListener('deviceorientation', handleDeviceOrientation);
+                }
+            })
+            .catch(console.error);
+    } else {
+        // Handle regular non-iOS 13+ devices
+        window.addEventListener('devicemotion', handleDeviceMotion);
+        window.addEventListener('deviceorientation', handleDeviceOrientation);
+    }
+}
+
+function handleDeviceMotion(event) {
+    const acceleration = event.accelerationIncludingGravity;
+    const currentTime = new Date().getTime();
+
+    if (currentTime - lastShakeTime > 1000) { // 1 second cooldown between shakes
+        const shakeMagnitude = Math.sqrt(acceleration.x * acceleration.x + acceleration.y * acceleration.y + acceleration.z * acceleration.z);
+
+        if (shakeMagnitude > shakeThreshold) {
+            lastShakeTime = currentTime;
+            resetAnimalPositions();
+        }
+    }
+}
+
+function handleDeviceOrientation(event) {
+    tiltX = event.gamma; // left/right tilt in degrees
+    tiltY = event.beta; // front/back tilt in degrees
+}
 
 document.addEventListener('DOMContentLoaded', function () {
     const video = document.getElementById('video');
@@ -35,13 +70,9 @@ document.addEventListener('DOMContentLoaded', function () {
         startVideoStream();
     });
     startVideoStream();
+    requestMotionPermission();
     let tiltX = 0;
     let tiltY = 0;
-
-    window.addEventListener('deviceorientation', function (event) {
-        tiltX = event.gamma; // left/right tilt in degrees
-        tiltY = event.beta; // front/back tilt in degrees
-    });
 
     function updateDirection(animal) {
         animal.direction += (Math.random() - 0.5) * animal.randomness;
