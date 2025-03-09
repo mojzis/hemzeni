@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shake Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #shakeMagnitude {
+            font-size: 2rem;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Shake Test</h1>
+    <p>Shake your device to see the calculated shake magnitude.</p>
+    <div id="shakeMagnitude">0</div>
+
+    <script>
+        let lastShakeTime = 0;
+        const shakeThreshold = 15; // Adjust this value as needed
+
+        window.addEventListener('devicemotion', function (event) {
+            const acceleration = event.accelerationIncludingGravity;
+            const currentTime = new Date().getTime();
+
+            if (currentTime - lastShakeTime > 1000) { // 1 second cooldown between shakes
+                const shakeMagnitude = Math.sqrt(acceleration.x * acceleration.x + acceleration.y * acceleration.y + acceleration.z * acceleration.z);
+
+                if (shakeMagnitude > shakeThreshold) {
+                    lastShakeTime = currentTime;
+                    document.getElementById('shakeMagnitude').innerText = shakeMagnitude.toFixed(2);
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
