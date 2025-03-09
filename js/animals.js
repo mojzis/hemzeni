@@ -8,15 +8,20 @@ var constraints = {
     }
 };
 
-navigator.mediaDevices.getUserMedia(constraints).then(function success(stream) {
-    video.srcObject = stream;
-});
+
+function startVideoStream() {
+    navigator.mediaDevices.getUserMedia(constraints).then(function success(stream) {
+        const video = document.getElementById('video');
+        video.srcObject = stream;
+    });
+}
 
 document.addEventListener('DOMContentLoaded', function () {
     const video = document.getElementById('video');
+    const toggleCameraButton = document.getElementById('toggleCameraButton');
     const animals = [
-        { id: 'beetle', element: null, x: 150, y: 100, direction: Math.random() * 2 * Math.PI, size: 50, growing: true, directionChanges: 0, speed: 1, randomness: 0.3, size_change: 0.3, rotateEvery: 3 },
-        { id: 'lachticek', element: null, x: 300, y: 200, direction: Math.random() * 2 * Math.PI, size: 50, growing: true, directionChanges: 0, speed: 1.5, randomness: 0.4, size_change: 0.2, rotateEvery: 3 }
+        { id: 'beetle', element: null, x: 150, y: 100, direction: Math.random() * 2 * Math.PI, size: 50, growing: true, directionChanges: 0, speed: 1, randomness: 0.3, size_change: 0.3, rotateEvery: 3, reactionSpeed: 0.05 },
+        { id: 'lachticek', element: null, x: 300, y: 200, direction: Math.random() * 2 * Math.PI, size: 50, growing: true, directionChanges: 0, speed: 1.5, randomness: 0.4, size_change: 0.2, rotateEvery: 5, reactionSpeed: 0.03 }
     ];
 
     animals.forEach(animal => {
@@ -24,9 +29,23 @@ document.addEventListener('DOMContentLoaded', function () {
         animal.element.style.left = animal.x + 'px';
         animal.element.style.top = animal.y + 'px';
     });
+    toggleCameraButton.addEventListener('click', function () {
+        facingMode = facingMode === "user" ? "environment" : "user";
+        constraints.video.facingMode = facingMode;
+        startVideoStream();
+    });
+    startVideoStream();
+    let tiltX = 0;
+    let tiltY = 0;
+
+    window.addEventListener('deviceorientation', function (event) {
+        tiltX = event.gamma; // left/right tilt in degrees
+        tiltY = event.beta; // front/back tilt in degrees
+    });
 
     function updateDirection(animal) {
         animal.direction += (Math.random() - 0.5) * animal.randomness;
+        animal.direction += animal.reactionSpeed * (tiltX / 90); // adjust direction based on tilt
     }
 
     function updatePosition(animal) {
