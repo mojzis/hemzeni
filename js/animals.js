@@ -98,6 +98,40 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
     }
+    function resetAnimalPositions() {
+        const corners = [
+            { x: 0, y: 0 },
+            { x: video.offsetWidth - 50, y: 0 },
+            { x: 0, y: video.offsetHeight - 50 },
+            { x: video.offsetWidth - 50, y: video.offsetHeight - 50 }
+        ];
+
+        animals.forEach((animal, index) => {
+            const corner = corners[index % corners.length];
+            animal.x = video.offsetLeft + corner.x;
+            animal.y = video.offsetTop + corner.y;
+            animal.element.style.left = animal.x + 'px';
+            animal.element.style.top = animal.y + 'px';
+            animal.direction = Math.random() * 2 * Math.PI;
+        });
+    }
+
+    let lastShakeTime = 0;
+    const shakeThreshold = 15; // Adjust this value as needed
+
+    window.addEventListener('devicemotion', function (event) {
+        const acceleration = event.accelerationIncludingGravity;
+        const currentTime = new Date().getTime();
+
+        if (currentTime - lastShakeTime > 1000) { // 1 second cooldown between shakes
+            const shakeMagnitude = Math.sqrt(acceleration.x * acceleration.x + acceleration.y * acceleration.y + acceleration.z * acceleration.z);
+
+            if (shakeMagnitude > shakeThreshold) {
+                lastShakeTime = currentTime;
+                resetAnimalPositions();
+            }
+        }
+    });
 
     function animateAnimals() {
         animals.forEach(animal => {
