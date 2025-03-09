@@ -90,10 +90,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         avoidCollision();
 
-        if (Math.random() < 0.01) {
-            const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
-            randomAnimal.element.style.display = randomAnimal.element.style.display === 'none' ? 'block' : 'none';
-        }
+        // if (Math.random() < 0.01) {
+        //     const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
+        //     randomAnimal.element.style.display = randomAnimal.element.style.display === 'none' ? 'block' : 'none';
+        // }
 
         requestAnimationFrame(animateAnimals);
     }
