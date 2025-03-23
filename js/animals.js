@@ -55,9 +55,47 @@ document.addEventListener('DOMContentLoaded', function () {
     const video = document.getElementById('video');
     const toggleCameraButton = document.getElementById('toggleCameraButton');
     const animals = [
-        { id: 'beetle', element: null, x: 150, y: 100, direction: Math.random() * 2 * Math.PI, size: 50, growing: true, directionChanges: 0, speed: 1, randomness: 0.3, size_change: 0.3, rotateEvery: 3, reactionSpeed: 0.05 },
-        { id: 'lachticek', element: null, x: 300, y: 200, direction: Math.random() * 2 * Math.PI, size: 50, growing: true, directionChanges: 0, speed: 1.5, randomness: 0.4, size_change: 0.2, rotateEvery: 5, reactionSpeed: 0.03 },
-        { id: 'kudlanka', element: null, x: 300, y: 200, direction: Math.random() * 2 * Math.PI, size: 50, growing: true, directionChanges: 0, speed: 1.5, randomness: 0.4, size_change: 0.2, rotateEvery: 5, reactionSpeed: 0.03 },
+        {
+            id: 'beetle', // zelenej stir
+            element: null,
+            x: 150, y: 100,
+            direction: Math.random() * 2 * Math.PI,
+            size: 50, growing: true,
+            directionChanges: 0,
+            speed: 1,
+            randomness: 0.3,
+            size_change: 1.2, // % of the size
+            rotateEvery: 3, // rotate every 3 direction changes
+            reactionSpeed: 0.1, // higher = faster reaction to tilt
+        },
+        {
+            id: 'lachticek',
+            element: null,
+            x: 300, y: 200,
+            direction: Math.random() * 2 * Math.PI,
+            size: 50,
+            growing: true,
+            directionChanges: 0,
+            speed: 1.5,
+            randomness: 0.7,
+            size_change: 0.5,
+            rotateEvery: 5,
+            reactionSpeed: 0.5,
+        },
+        {
+            id: 'kudlanka',
+            element: null,
+            x: 300, y: 200,
+            direction: Math.random() * 2 * Math.PI,
+            size: 50,
+            growing: true,
+            directionChanges: 0,
+            speed: 1.5,
+            randomness: 0.4,
+            size_change: 0.6,
+            rotateEvery: 7,
+            reactionSpeed: 0.03
+        },
         { id: 'blecha', element: null, x: 300, y: 200, direction: Math.random() * 2 * Math.PI, size: 50, growing: true, directionChanges: 0, speed: 1.5, randomness: 0.4, size_change: 0.2, rotateEvery: 5, reactionSpeed: 0.03 }
     ];
 
@@ -116,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Scale the size based on the distance (closer to center = larger size)
         const sizeFactor = 1 - distanceFromCenter / maxDistance; // Scale between 0 and 1
-        const newSize = 50 + sizeFactor * 50; // Base size is 50px, max size is 100px
+        const newSize = 50 + sizeFactor * (90 * animal.size_change); // Base size is 50px, scaled by size_change
 
         animal.size = newSize;
         animal.element.style.width = animal.size + 'px';
@@ -138,28 +176,50 @@ document.addEventListener('DOMContentLoaded', function () {
         if (animal.x <= videoLeft || animal.x >= videoRight - animal.element.offsetWidth ||
             animal.y <= videoTop || animal.y >= videoBottom - animal.element.offsetHeight) {
 
-            // Temporarily hide the animal
-            animal.element.style.display = 'none';
+            // Randomly decide if the animal should disappear
+            const shouldDisappear = Math.random() < 0.2; // 20% chance to disappear
 
-            // Teleport the animal to the opposite side
-            if (animal.x <= videoLeft) {
-                animal.x = videoRight - animal.element.offsetWidth;
-            } else if (animal.x >= videoRight - animal.element.offsetWidth) {
-                animal.x = videoLeft;
-            }
+            if (shouldDisappear) {
+                // Temporarily hide the animal
+                animal.element.style.display = 'none';
 
-            if (animal.y <= videoTop) {
-                animal.y = videoBottom - animal.element.offsetHeight;
-            } else if (animal.y >= videoBottom - animal.element.offsetHeight) {
-                animal.y = videoTop;
-            }
+                // Teleport the animal to the opposite side
+                if (animal.x <= videoLeft) {
+                    animal.x = videoRight - animal.element.offsetWidth;
+                } else if (animal.x >= videoRight - animal.element.offsetWidth) {
+                    animal.x = videoLeft;
+                }
 
-            // Update the position and make the animal visible again after a short delay
-            setTimeout(() => {
+                if (animal.y <= videoTop) {
+                    animal.y = videoBottom - animal.element.offsetHeight;
+                } else if (animal.y >= videoBottom - animal.element.offsetHeight) {
+                    animal.y = videoTop;
+                }
+
+                // Update the position and make the animal visible again after a longer delay
+                setTimeout(() => {
+                    animal.element.style.left = animal.x + 'px';
+                    animal.element.style.top = animal.y + 'px';
+                    animal.element.style.display = 'block';
+                }, 6000);
+            } else {
+                // Teleport without disappearing
+                if (animal.x <= videoLeft) {
+                    animal.x = videoRight - animal.element.offsetWidth;
+                } else if (animal.x >= videoRight - animal.element.offsetWidth) {
+                    animal.x = videoLeft;
+                }
+
+                if (animal.y <= videoTop) {
+                    animal.y = videoBottom - animal.element.offsetHeight;
+                } else if (animal.y >= videoBottom - animal.element.offsetHeight) {
+                    animal.y = videoTop;
+                }
+
+                // Update the position immediately
                 animal.element.style.left = animal.x + 'px';
                 animal.element.style.top = animal.y + 'px';
-                animal.element.style.display = 'block';
-            }, 800); // 200ms delay
+            }
         }
     }
     function avoidCollision() {
@@ -212,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     let lastShakeTime = 0;
-    const shakeThreshold = 15; // Adjust this value as needed
+    const shakeThreshold = 15;
 
     window.addEventListener('devicemotion', function (event) {
         const acceleration = event.accelerationIncludingGravity;
