@@ -325,13 +325,21 @@
         }
 
         #toggleCameraButton {
-            position: absolute;
-            top: 10px;
-            right: 10px;
+            position: static;
+            /* top: 10px;
+            right: 10px; */
             z-index: 10;
             padding: 10px;
             background-color: #fff;
             border: 1px solid #ccc;
+            cursor: pointer;
+        }
+
+        #requestMotionButton {
+            display: none;
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
             cursor: pointer;
         }
     </style>
@@ -343,8 +351,37 @@
         <video id="video" playsinline autoplay muted></video>
         <img class="zviratko" id="beetle" src="img/brouk1.png">
         <img class="zviratko" id="lachticek" src="img/lachticek.png">
+        <img class="zviratko" id="kudlanka" src="img/kudlanka.png">
+        <img class="zviratko" id="blecha" src="img/blecha.png">
         <button id="toggleCameraButton">Toggle Camera</button>
+        <button id="requestMotionButton">Request Motion Permission</button>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const requestMotionButton = document.getElementById('requestMotionButton');
+
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                requestMotionButton.style.display = 'block';
+                requestMotionButton.addEventListener('click', function () {
+                    DeviceMotionEvent.requestPermission()
+                        .then(permissionState => {
+                            if (permissionState === 'granted') {
+                                window.addEventListener('devicemotion', handleDeviceMotion);
+                                requestMotionButton.style.display = 'none';
+                            }
+                        })
+                        .catch(console.error);
+                });
+            } else {
+                // Non-iOS devices
+                window.addEventListener('devicemotion', handleDeviceMotion);
+            }
+
+            function handleDeviceMotion(event) {
+                console.log('Device motion detected:', event.accelerationIncludingGravity);
+            }
+        });
+    </script>
 </body>
 
 </html>
