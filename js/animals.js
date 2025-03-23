@@ -56,17 +56,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const toggleCameraButton = document.getElementById('toggleCameraButton');
     const animals = [
         {
-            id: 'beetle', // zelenej stir
+            id: 'beetle',
             element: null,
             x: 150, y: 100,
             direction: Math.random() * 2 * Math.PI,
             size: 50, growing: true,
             directionChanges: 0,
-            speed: 1,
+            speed: 0.1,
             randomness: 0.3,
-            size_change: 1.2, // % of the size
-            rotateEvery: 3, // rotate every 3 direction changes
-            reactionSpeed: 0.1, // higher = faster reaction to tilt
+            size_change: 1.2,
+            rotateEvery: 3,
+            reactionSpeed: 0.1,
+            movementPattern: { type: 'oscillation', amplitude: 1, frequency: 0.05 } // Oscillation pattern
         },
         {
             id: 'lachticek',
@@ -76,11 +77,13 @@ document.addEventListener('DOMContentLoaded', function () {
             size: 50,
             growing: true,
             directionChanges: 0,
-            speed: 1.5,
-            randomness: 0.7,
+            speed: 0.2,
+            randomness: 0.2,
             size_change: 0.5,
             rotateEvery: 5,
             reactionSpeed: 0.5,
+            // movementPattern: { type: 'jitter', intensity: 0.001 } // Jitter pattern
+            movementPattern: { type: 'jump', jumpDistance: 5, jumpInterval: 1 } // Jumping pattern
         },
         {
             id: 'kudlanka',
@@ -90,13 +93,28 @@ document.addEventListener('DOMContentLoaded', function () {
             size: 50,
             growing: true,
             directionChanges: 0,
-            speed: 1.5,
+            speed: 0.3,
             randomness: 0.4,
-            size_change: 0.6,
+            size_change: 0.9,
             rotateEvery: 7,
-            reactionSpeed: 0.03
+            reactionSpeed: 0.03,
+            movementPattern: { type: 'loop', radius: 1, speed: 0.1 } // Looping pattern
         },
-        { id: 'blecha', element: null, x: 300, y: 200, direction: Math.random() * 2 * Math.PI, size: 50, growing: true, directionChanges: 0, speed: 1.5, randomness: 0.4, size_change: 0.2, rotateEvery: 5, reactionSpeed: 0.03 }
+        {
+            id: 'blecha',
+            element: null,
+            x: 300, y: 200,
+            direction: Math.random() * 2 * Math.PI,
+            size: 50,
+            growing: true,
+            directionChanges: 0,
+            speed: 0.4,
+            randomness: 0.4,
+            size_change: 0.2,
+            rotateEvery: 5,
+            reactionSpeed: 0.03,
+            movementPattern: { type: 'loop', radius: 5, speed: 0.5 } // Looping pattern
+        }
     ];
 
     animals.forEach(animal => {
@@ -119,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function () {
         animal.direction += animal.reactionSpeed * (tiltX / 90); // adjust direction based on tilt
     }
 
-    function updatePosition(animal) {
+    function updatePositionOld(animal) {
         animal.x += animal.speed * Math.cos(animal.direction);
         animal.y += animal.speed * Math.sin(animal.direction);
 
@@ -136,7 +154,54 @@ document.addEventListener('DOMContentLoaded', function () {
         animal.element.style.left = animal.x + 'px';
         animal.element.style.top = animal.y + 'px';
     }
+    function updatePosition(animal) {
+        // Base movement (from updatePositionOld)
+        animal.x += animal.speed * Math.cos(animal.direction);
+        animal.y += animal.speed * Math.sin(animal.direction);
 
+        if (animal.x <= video.offsetLeft || animal.x >= video.offsetLeft + video.offsetWidth - animal.element.offsetWidth ||
+            animal.y <= video.offsetTop || animal.y >= video.offsetTop + video.offsetHeight - animal.element.offsetHeight) {
+            animal.direction = Math.random() * 2 * Math.PI;
+            animal.growing = !animal.growing;
+            animal.directionChanges++;
+        }
+
+        // Apply movement pattern
+        const pattern = animal.movementPattern;
+        if (pattern) {
+            const time = performance.now() / 1000; // Time in seconds
+
+            if (pattern.type === 'oscillation') {
+                // Oscillate along the direction of movement
+                animal.x += Math.sin(time * pattern.frequency) * pattern.amplitude;
+                animal.y += Math.cos(time * pattern.frequency) * pattern.amplitude;
+            } else if (pattern.type === 'jitter') {
+                // Random jitter around the current position
+                animal.x += (Math.random() - 0.05) * pattern.intensity;
+                animal.y += (Math.random() - 0.05) * pattern.intensity;
+            } else if (pattern.type === 'loop') {
+                // Circular looping movement
+                animal.x += Math.cos(time * pattern.speed) * pattern.radius;
+                animal.y += Math.sin(time * pattern.speed) * pattern.radius;
+            } else if (pattern.type === 'jump') {
+                // Jumping movement
+                if (!animal.lastJumpTime || time - animal.lastJumpTime > pattern.jumpInterval) {
+                    animal.lastJumpTime = time; // Update the last jump time
+                    const jumpAngle = Math.random() * 2 * Math.PI; // Random jump direction
+                    animal.x += Math.cos(jumpAngle) * pattern.jumpDistance;
+                    animal.y += Math.sin(jumpAngle) * pattern.jumpDistance;
+                }
+            }
+        }
+
+        // Keep the animal within bounds
+        animal.x = Math.max(video.offsetLeft, Math.min(animal.x, video.offsetLeft + video.offsetWidth - animal.element.offsetWidth));
+        animal.y = Math.max(video.offsetTop, Math.min(animal.y, video.offsetTop + video.offsetHeight - animal.element.offsetHeight));
+
+        // Update the animal's position
+        animal.element.style.left = animal.x + 'px';
+        animal.element.style.top = animal.y + 'px';
+    }
     function updateSize(animal) {
         const centerX = video.offsetLeft + video.offsetWidth / 2;
         const centerY = video.offsetTop + video.offsetHeight / 2;
@@ -154,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Scale the size based on the distance (closer to center = larger size)
         const sizeFactor = 1 - distanceFromCenter / maxDistance; // Scale between 0 and 1
-        const newSize = 50 + sizeFactor * (90 * animal.size_change); // Base size is 50px, scaled by size_change
+        const newSize = 50 + sizeFactor * (80 * animal.size_change); // Base size is 50px, scaled by size_change
 
         animal.size = newSize;
         animal.element.style.width = animal.size + 'px';
@@ -201,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     animal.element.style.left = animal.x + 'px';
                     animal.element.style.top = animal.y + 'px';
                     animal.element.style.display = 'block';
-                }, 6000);
+                }, 10000);
             } else {
                 // Teleport without disappearing
                 if (animal.x <= videoLeft) {

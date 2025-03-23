@@ -342,6 +342,14 @@
             font-size: 1rem;
             cursor: pointer;
         }
+
+        #animalList {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
     </style>
     <script src="js/animals.js"></script>
 </head>
@@ -353,8 +361,28 @@
         <img class="zviratko" id="lachticek" src="img/lachticek.png">
         <img class="zviratko" id="kudlanka" src="img/kudlanka.png">
         <img class="zviratko" id="blecha" src="img/blecha.png">
-        <button id="toggleCameraButton">Toggle Camera</button>
-        <button id="requestMotionButton">Request Motion Permission</button>
+        <!-- <button id="toggleCameraButton">Toggle Camera</button>
+        <button id="requestMotionButton">Request Motion Permission</button> -->
+    </div>
+    <div id="animalList">
+        <a href="img/brouk1.png" style="text-decoration: none;">
+            <img src="img/brouk1.png" alt="Beetle" style="width: 50px; height: 50px;">
+        </a>
+        <a href="img/lachticek.png" style="text-decoration: none;">
+            <img src="img/lachticek.png" alt="Lachticek" style="width: 50px; height: 50px;">
+        </a>
+        <a href="img/kudlanka.png" style="text-decoration: none;">
+            <img src="img/kudlanka.png" alt="Kudlanka" style="width: 50px; height: 50px;">
+        </a>
+        <a href="img/blecha.png" style="text-decoration: none;">
+            <img src="img/blecha.png" alt="Blecha" style="width: 50px; height: 50px;">
+        </a>
+        <button id="toggleCameraButton"
+            style="padding: 10px; background-color: #fff; border: 1px solid #ccc; cursor: pointer;">Toggle
+            Camera</button>
+        <button id="requestMotionButton"
+            style="display: none; padding: 10px 20px; font-size: 1rem; cursor: pointer;">Request Motion
+            Permission</button>
     </div>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
