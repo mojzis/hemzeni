@@ -351,35 +351,44 @@
             margin-top: 20px;
         }
     </style>
+    <!-- TensorFlow.js and Pose Detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+    
     <script src="js/animals.js"></script>
 </head>
 
 <body>
     <div style="position: relative;">
         <video id="video" playsinline autoplay muted></video>
-        <img class="zviratko" id="beetle" src="img/brouk1.png">
-        <img class="zviratko" id="lachticek" src="img/lachticek.png">
-        <img class="zviratko" id="kudlanka" src="img/kudlanka.png">
-        <img class="zviratko" id="blecha" src="img/blecha.png">
+        <canvas id="poseCanvas" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
+        <img class="zviratko" id="big_brouk" src="img/big_brouk.png">
+        <img class="zviratko" id="brouk_medium" src="img/brouk_medium.png">
+        <img class="zviratko" id="small_brouk" src="img/small_brouk.png">
+        <!-- <img class="zviratko" id="blecha" src="img/blecha.png"> -->
         <!-- <button id="toggleCameraButton">Toggle Camera</button>
         <button id="requestMotionButton">Request Motion Permission</button> -->
     </div>
     <div id="animalList">
-        <a href="img/brouk1.png" style="text-decoration: none;">
-            <img src="img/brouk1.png" alt="Beetle" style="width: 50px; height: 50px;">
+        <a href="img/big_brouk.png" style="text-decoration: none;">
+            <img src="img/big_brouk.png" alt="Beetle" style="width: 50px; height: 50px;">
         </a>
-        <a href="img/lachticek.png" style="text-decoration: none;">
-            <img src="img/lachticek.png" alt="Lachticek" style="width: 50px; height: 50px;">
+        <a href="img/brouk_medium.png" style="text-decoration: none;">
+            <img src="img/brouk_medium.png" alt="Lachticek" style="width: 50px; height: 50px;">
         </a>
-        <a href="img/kudlanka.png" style="text-decoration: none;">
-            <img src="img/kudlanka.png" alt="Kudlanka" style="width: 50px; height: 50px;">
+        <a href="img/small_brouk.png" style="text-decoration: none;">
+            <img src="img/small_brouk.png" alt="Kudlanka" style="width: 50px; height: 50px;">
         </a>
-        <a href="img/blecha.png" style="text-decoration: none;">
+        <!-- <a href="img/blecha.png" style="text-decoration: none;">
             <img src="img/blecha.png" alt="Blecha" style="width: 50px; height: 50px;">
-        </a>
+        </a> -->
         <button id="toggleCameraButton"
             style="padding: 10px; background-color: #fff; border: 1px solid #ccc; cursor: pointer;">Toggle
             Camera</button>
+        <button id="togglePoseButton"
+            style="padding: 10px; background-color: #fff; border: 1px solid #ccc; cursor: pointer;">Show Poses</button>
         <button id="requestMotionButton"
             style="display: none; padding: 10px 20px; font-size: 1rem; cursor: pointer;">Request Motion
             Permission</button>
