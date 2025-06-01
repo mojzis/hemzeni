@@ -8,12 +8,55 @@ var constraints = {
     }
 };
 
+// Pose detection variables
+let detector = null;
+let lastPoseTime = 0;
+const POSE_DETECTION_INTERVAL = 100; // Run pose detection every 100ms
+
+// Global poses array for debugging - moved to window object for easier access
+window.poses = [];
+
+// Shake detection variables
+let lastShakeTime = 0;
+const shakeThreshold = 15;
+
+// Global animals array for debugging and tweaking
+let animals = [];
+
+// Pose visualization variables
+let showPoses = false;
+let poseCanvas = null;
+let poseCtx = null;
+
 
 function startVideoStream() {
     navigator.mediaDevices.getUserMedia(constraints).then(function success(stream) {
         const video = document.getElementById('video');
         video.srcObject = stream;
+        // Initialize pose detection after video stream is ready
+        video.addEventListener('loadeddata', () => {
+            initializePoseDetection();
+        });
     });
+}
+
+async function initializePoseDetection() {
+    try {
+        const detectorConfig = {
+            modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+            enableSmoothing: true,
+            minPoseScore: 0.25
+        };
+        
+        detector = await poseDetection.createDetector(
+            poseDetection.SupportedModels.MoveNet,
+            detectorConfig
+        );
+        
+        console.log('Pose detector initialized');
+    } catch (error) {
+        console.error('Failed to initialize pose detection:', error);
+    }
 }
 function requestMotionPermission() {
     if (typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -51,26 +94,131 @@ function handleDeviceOrientation(event) {
     tiltY = event.beta; // front/back tilt in degrees
 }
 
+// Skeleton connections for MoveNet
+const SKELETON_CONNECTIONS = [
+    ['nose', 'left_eye'],
+    ['nose', 'right_eye'],
+    ['left_eye', 'left_ear'],
+    ['right_eye', 'right_ear'],
+    ['left_shoulder', 'right_shoulder'],
+    ['left_shoulder', 'left_elbow'],
+    ['left_elbow', 'left_wrist'],
+    ['right_shoulder', 'right_elbow'],
+    ['right_elbow', 'right_wrist'],
+    ['left_shoulder', 'left_hip'],
+    ['right_shoulder', 'right_hip'],
+    ['left_hip', 'right_hip'],
+    ['left_hip', 'left_knee'],
+    ['left_knee', 'left_ankle'],
+    ['right_hip', 'right_knee'],
+    ['right_knee', 'right_ankle']
+];
+
+function drawKeypoint(ctx, keypoint) {
+    if (keypoint.score < 0.3) return;
+    
+    ctx.beginPath();
+    ctx.arc(keypoint.x, keypoint.y, 5, 0, 2 * Math.PI);
+    ctx.fillStyle = keypoint.score > 0.5 ? '#00ff00' : '#ffff00';
+    ctx.fill();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+}
+
+function drawSkeleton(ctx, keypoints) {
+    ctx.strokeStyle = '#00ff00';
+    ctx.lineWidth = 2;
+    
+    SKELETON_CONNECTIONS.forEach(([start, end]) => {
+        const startPoint = keypoints.find(kp => kp.name === start);
+        const endPoint = keypoints.find(kp => kp.name === end);
+        
+        if (startPoint && endPoint && startPoint.score > 0.3 && endPoint.score > 0.3) {
+            ctx.beginPath();
+            ctx.moveTo(startPoint.x, startPoint.y);
+            ctx.lineTo(endPoint.x, endPoint.y);
+            ctx.stroke();
+        }
+    });
+}
+
+function drawPoses() {
+    if (!showPoses || !poseCanvas || !poseCtx || !window.poses) return;
+    
+    // Clear canvas
+    poseCtx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+    
+    // Draw each pose
+    window.poses.forEach(pose => {
+        if (pose.score < 0.3) return;
+        
+        // Draw skeleton connections first
+        drawSkeleton(poseCtx, pose.keypoints);
+        
+        // Draw keypoints on top
+        pose.keypoints.forEach(keypoint => {
+            drawKeypoint(poseCtx, keypoint);
+        });
+        
+        // Draw pose score
+        poseCtx.fillStyle = '#00ff00';
+        poseCtx.font = '16px Arial';
+        poseCtx.fillText(`Score: ${pose.score.toFixed(2)}`, 10, 30);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const video = document.getElementById('video');
     const toggleCameraButton = document.getElementById('toggleCameraButton');
-    const animals = [
+    const togglePoseButton = document.getElementById('togglePoseButton');
+    
+    // Initialize pose canvas
+    poseCanvas = document.getElementById('poseCanvas');
+    poseCtx = poseCanvas.getContext('2d');
+    
+    // Set canvas size to match video
+    video.addEventListener('loadedmetadata', () => {
+        poseCanvas.width = video.videoWidth;
+        poseCanvas.height = video.videoHeight;
+        // Adjust canvas position and size when video loads
+        const resizeCanvas = () => {
+            poseCanvas.style.width = video.offsetWidth + 'px';
+            poseCanvas.style.height = video.offsetHeight + 'px';
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+    });
+    
+    // Toggle pose visualization
+    togglePoseButton.addEventListener('click', function() {
+        showPoses = !showPoses;
+        this.textContent = showPoses ? 'Hide Poses' : 'Show Poses';
+        this.style.backgroundColor = showPoses ? '#90EE90' : '#fff';
+        if (!showPoses) {
+            poseCtx.clearRect(0, 0, poseCanvas.width, poseCanvas.height);
+        }
+    });
+    
+    // Initialize global animals array
+    animals = [
         {
-            id: 'beetle',
+            id: 'big_brouk',
             element: null,
             x: 150, y: 100,
             direction: Math.random() * 2 * Math.PI,
-            size: 50, growing: true,
+            size: 55, growing: true,
             directionChanges: 0,
             speed: 0.1,
             randomness: 0.3,
             size_change: 1.2,
             rotateEvery: 3,
             reactionSpeed: 0.1,
-            movementPattern: { type: 'oscillation', amplitude: 1, frequency: 0.05 } // Oscillation pattern
+            movementPattern: { type: 'oscillation', amplitude: 1, frequency: 0.05 }, // Oscillation pattern
+            trackingBehavior: { type: 'nose', offset: { x: 0, y: -200 } } // Track nose with offset
         },
         {
-            id: 'lachticek',
+            id: 'brouk_medium',
             element: null,
             x: 300, y: 200,
             direction: Math.random() * 2 * Math.PI,
@@ -86,35 +234,36 @@ document.addEventListener('DOMContentLoaded', function () {
             movementPattern: { type: 'jump', jumpDistance: 5, jumpInterval: 1 } // Jumping pattern
         },
         {
-            id: 'kudlanka',
+            id: 'small_brouk',
             element: null,
             x: 300, y: 200,
             direction: Math.random() * 2 * Math.PI,
-            size: 50,
+            size: 45,
             growing: true,
             directionChanges: 0,
             speed: 0.3,
-            randomness: 0.4,
+            randomness: 0.2,
             size_change: 0.9,
             rotateEvery: 7,
-            reactionSpeed: 0.03,
-            movementPattern: { type: 'loop', radius: 1, speed: 0.1 } // Looping pattern
+            reactionSpeed: 0.5,
+            movementPattern: { type: 'loop', radius: 1, speed: 0.1 }, // Fixed: Loop pattern with correct parameters
+            trackingBehavior: { type: 'raised_palm', offset: { x: 0, y: 0 } } // Track raised palm
         },
-        {
-            id: 'blecha',
-            element: null,
-            x: 300, y: 200,
-            direction: Math.random() * 2 * Math.PI,
-            size: 50,
-            growing: true,
-            directionChanges: 0,
-            speed: 0.4,
-            randomness: 0.4,
-            size_change: 0.2,
-            rotateEvery: 5,
-            reactionSpeed: 0.03,
-            movementPattern: { type: 'loop', radius: 5, speed: 0.5 } // Looping pattern
-        }
+        // {
+        //     id: 'blecha',
+        //     element: null,
+        //     x: 300, y: 200,
+        //     direction: Math.random() * 2 * Math.PI,
+        //     size: 50,
+        //     growing: true,
+        //     directionChanges: 0,
+        //     speed: 0.4,
+        //     randomness: 0.4,
+        //     size_change: 0.2,
+        //     rotateEvery: 5,
+        //     reactionSpeed: 0.03,
+        //     movementPattern: { type: 'loop', radius: 5, speed: 0.5 } // Looping pattern
+        // }
     ];
 
     animals.forEach(animal => {
@@ -166,15 +315,17 @@ document.addEventListener('DOMContentLoaded', function () {
             animal.directionChanges++;
         }
 
-        // Apply movement pattern
+        // Apply movement pattern (but not when escaping from a person)
         const pattern = animal.movementPattern;
-        if (pattern) {
+        if (pattern && !animal.escaping) {
             const time = performance.now() / 1000; // Time in seconds
 
             if (pattern.type === 'oscillation') {
                 // Oscillate along the direction of movement
-                animal.x += Math.sin(time * pattern.frequency) * pattern.amplitude;
-                animal.y += Math.cos(time * pattern.frequency) * pattern.amplitude;
+                const freq = pattern.frequency || 0.05;
+                const amp = pattern.amplitude || 1;
+                animal.x += Math.sin(time * freq) * amp;
+                animal.y += Math.cos(time * freq) * amp;
             } else if (pattern.type === 'jitter') {
                 // Random jitter around the current position
                 animal.x += (Math.random() - 0.05) * pattern.intensity;
@@ -194,6 +345,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
+        // Check for NaN and reset if needed
+        if (isNaN(animal.x) || isNaN(animal.y)) {
+            console.warn(`NaN detected for ${animal.id}, resetting position`);
+            animal.x = video.offsetLeft + Math.random() * (video.offsetWidth - animal.element.offsetWidth);
+            animal.y = video.offsetTop + Math.random() * (video.offsetHeight - animal.element.offsetHeight);
+        }
+        
         // Keep the animal within bounds
         animal.x = Math.max(video.offsetLeft, Math.min(animal.x, video.offsetLeft + video.offsetWidth - animal.element.offsetWidth));
         animal.y = Math.max(video.offsetTop, Math.min(animal.y, video.offsetTop + video.offsetHeight - animal.element.offsetHeight));
@@ -289,31 +447,38 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     function avoidCollision() {
         for (let i = 0; i < animals.length; i++) {
+            // Skip collision detection for animals that are actively tracking
+            if (animals[i].isCurrentlyTracking) continue;
+            
             for (let j = i + 1; j < animals.length; j++) {
+                // Skip if the other animal is tracking
+                if (animals[j].isCurrentlyTracking) continue;
+                
                 const dx = animals[i].x - animals[j].x;
                 const dy = animals[i].y - animals[j].y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Use average size for collision detection
+                const avgSize = (animals[i].size + animals[j].size) / 2;
+                const minDistance = avgSize * 0.8; // Slightly smaller to prevent entanglement
 
-                if (distance < animals[i].element.offsetWidth) { // Collision detected
-                    // Adjust positions to push animals apart
-                    const overlap = animals[i].element.offsetWidth - distance;
-                    const pushFactor = overlap / 2;
-
+                if (distance < minDistance && distance > 0) { // Collision detected
+                    // Calculate separation force
+                    const overlap = minDistance - distance;
+                    const separationForce = Math.min(overlap * 0.3, 3); // Limit the force
+                    
                     const angle = Math.atan2(dy, dx);
-                    animals[i].x += Math.cos(angle) * pushFactor;
-                    animals[i].y += Math.sin(angle) * pushFactor;
-                    animals[j].x -= Math.cos(angle) * pushFactor;
-                    animals[j].y -= Math.sin(angle) * pushFactor;
-
-                    // Update their positions
-                    animals[i].element.style.left = animals[i].x + 'px';
-                    animals[i].element.style.top = animals[i].y + 'px';
-                    animals[j].element.style.left = animals[j].x + 'px';
-                    animals[j].element.style.top = animals[j].y + 'px';
-
-                    // Change their directions randomly to avoid getting stuck
-                    animals[i].direction = Math.random() * 2 * Math.PI;
-                    animals[j].direction = Math.random() * 2 * Math.PI;
+                    
+                    // Apply separation with damping to prevent jittering
+                    animals[i].x += Math.cos(angle) * separationForce;
+                    animals[i].y += Math.sin(angle) * separationForce;
+                    animals[j].x -= Math.cos(angle) * separationForce;
+                    animals[j].y -= Math.sin(angle) * separationForce;
+                    
+                    // Smoothly adjust directions instead of random changes
+                    const directionChange = 0.5; // Radians
+                    animals[i].direction = angle + directionChange;
+                    animals[j].direction = angle + Math.PI - directionChange;
                 }
             }
         }
@@ -336,9 +501,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    let lastShakeTime = 0;
-    const shakeThreshold = 15;
-
     window.addEventListener('devicemotion', function (event) {
         const acceleration = event.accelerationIncludingGravity;
         const currentTime = new Date().getTime();
@@ -353,16 +515,250 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    async function detectPoses() {
+        if (!detector) return;
+        
+        const currentTime = performance.now();
+        if (currentTime - lastPoseTime < POSE_DETECTION_INTERVAL) return;
+        
+        lastPoseTime = currentTime;
+        
+        try {
+            const video = document.getElementById('video');
+            window.poses = await detector.estimatePoses(video);
+            // console.log('Detected poses:', window.poses);
+        } catch (error) {
+            console.error('Pose detection error:', error);
+        }
+    }
+
+    function avoidPeople(animal) {
+        if (!window.poses || window.poses.length === 0) return;
+        
+        // Check if animal has tracking behavior
+        if (animal.trackingBehavior && window.poses.length > 0) {
+            const pose = window.poses[0]; // Use the first detected pose
+            
+            if (animal.trackingBehavior.type === 'nose') {
+                const noseKeypoint = pose.keypoints.find(kp => kp.name === 'nose');
+                
+                if (noseKeypoint && noseKeypoint.score > 0.3) {
+                    // Convert keypoint coordinates to video element coordinates
+                    const scaleX = video.offsetWidth / video.videoWidth;
+                    const scaleY = video.offsetHeight / video.videoHeight;
+                    
+                    // Target position with offset, scaled to match video display size
+                    const targetX = (noseKeypoint.x * scaleX) + video.offsetLeft - animal.element.offsetWidth / 2 + animal.trackingBehavior.offset.x;
+                    const targetY = (noseKeypoint.y * scaleY) + video.offsetTop + animal.trackingBehavior.offset.y;
+                    
+                    // Smoothly move towards the target position
+                    const moveSpeed = 0.15; // How quickly to follow (0-1)
+                    animal.x += (targetX - animal.x) * moveSpeed;
+                    animal.y += (targetY - animal.y) * moveSpeed;
+                    
+                    // Update DOM position
+                    animal.element.style.left = animal.x + 'px';
+                    animal.element.style.top = animal.y + 'px';
+                    
+                    // Override normal movement for this animal
+                    return;
+                }
+            } else if (animal.trackingBehavior.type === 'raised_palm') {
+                // Check if palm is raised (wrist above elbow)
+                const leftWrist = pose.keypoints.find(kp => kp.name === 'left_wrist');
+                const leftElbow = pose.keypoints.find(kp => kp.name === 'left_elbow');
+                const rightWrist = pose.keypoints.find(kp => kp.name === 'right_wrist');
+                const rightElbow = pose.keypoints.find(kp => kp.name === 'right_elbow');
+                
+                let targetWrist = null;
+                
+                // Check left hand
+                if (leftWrist && leftElbow && leftWrist.score > 0.3 && leftElbow.score > 0.3) {
+                    if (leftWrist.y <= leftElbow.y) { // Wrist is at or above elbow
+                        targetWrist = leftWrist;
+                    }
+                }
+                
+                // Check right hand (prefer if both are raised)
+                if (rightWrist && rightElbow && rightWrist.score > 0.3 && rightElbow.score > 0.3) {
+                    if (rightWrist.y <= rightElbow.y) { // Wrist is at or above elbow
+                        targetWrist = rightWrist;
+                    }
+                }
+                
+                if (targetWrist) {
+                    // Convert keypoint coordinates to video element coordinates
+                    const scaleX = video.offsetWidth / video.videoWidth;
+                    const scaleY = video.offsetHeight / video.videoHeight;
+                    
+                    // Target position at the palm/wrist with offset, scaled to match video display size
+                    const targetX = (targetWrist.x * scaleX) + video.offsetLeft - animal.element.offsetWidth / 2 + animal.trackingBehavior.offset.x;
+                    const targetY = (targetWrist.y * scaleY) + video.offsetTop - animal.element.offsetHeight / 2 + animal.trackingBehavior.offset.y;
+                    
+                    // Smoothly move towards the target position
+                    const moveSpeed = 0.2; // Slightly faster for hand tracking
+                    animal.x += (targetX - animal.x) * moveSpeed;
+                    animal.y += (targetY - animal.y) * moveSpeed;
+                    
+                    // Update DOM position
+                    animal.element.style.left = animal.x + 'px';
+                    animal.element.style.top = animal.y + 'px';
+                    
+                    // Override normal movement for this animal
+                    return;
+                }
+            }
+        }
+        
+        const avoidanceMargin = 50; // Pixels to add around the bounding box
+        const repulsionStrength = 8; // How strongly to push away
+        
+        window.poses.forEach(pose => {
+            if (pose.score < 0.3) return; // Skip low confidence poses
+            
+            // Calculate bounding box around all keypoints
+            let minX = Infinity;
+            let minY = Infinity;
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+            let validPoints = 0;
+            
+            // Get video scaling factors
+            const scaleX = video.offsetWidth / video.videoWidth;
+            const scaleY = video.offsetHeight / video.videoHeight;
+            
+            // Find the bounds of all keypoints
+            pose.keypoints.forEach(keypoint => {
+                if (keypoint.score > 0.2) { // Lower threshold to include more points
+                    const scaledX = keypoint.x * scaleX + video.offsetLeft;
+                    const scaledY = keypoint.y * scaleY + video.offsetTop;
+                    minX = Math.min(minX, scaledX);
+                    minY = Math.min(minY, scaledY);
+                    maxX = Math.max(maxX, scaledX);
+                    maxY = Math.max(maxY, scaledY);
+                    validPoints++;
+                }
+            });
+            
+            if (validPoints > 0) {
+                // Expand the bounding box by the avoidance margin
+                minX -= avoidanceMargin;
+                minY -= avoidanceMargin;
+                maxX += avoidanceMargin;
+                maxY += avoidanceMargin;
+                
+                // Get animal center position
+                const animalCenterX = animal.x + animal.element.offsetWidth / 2;
+                const animalCenterY = animal.y + animal.element.offsetHeight / 2;
+                
+                // Check if animal is inside or near the bounding box
+                if (animalCenterX >= minX && animalCenterX <= maxX && 
+                    animalCenterY >= minY && animalCenterY <= maxY) {
+                    
+                    // Calculate the center of the bounding box
+                    const boxCenterX = (minX + maxX) / 2;
+                    const boxCenterY = (minY + maxY) / 2;
+                    
+                    // Calculate repulsion direction from box center
+                    const dx = animalCenterX - boxCenterX;
+                    const dy = animalCenterY - boxCenterY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // Prevent division by zero and handle center position
+                    if (distance < 1) {
+                        // If animal is at center, push in a random direction
+                        const randomAngle = Math.random() * 2 * Math.PI;
+                        animal.x += Math.cos(randomAngle) * repulsionStrength;
+                        animal.y += Math.sin(randomAngle) * repulsionStrength;
+                        animal.direction = randomAngle;
+                    } else {
+                        const angle = Math.atan2(dy, dx);
+                        
+                        // Calculate distance to nearest edge of the box
+                        const distToLeft = animalCenterX - minX;
+                        const distToRight = maxX - animalCenterX;
+                        const distToTop = animalCenterY - minY;
+                        const distToBottom = maxY - animalCenterY;
+                        const minEdgeDist = Math.min(distToLeft, distToRight, distToTop, distToBottom);
+                        
+                        // Use a minimum push force to ensure movement
+                        const pushForce = Math.max(repulsionStrength * 0.5, repulsionStrength * (1 - minEdgeDist / avoidanceMargin));
+                        
+                        // Apply repulsion force
+                        animal.x += Math.cos(angle) * pushForce;
+                        animal.y += Math.sin(angle) * pushForce;
+                        
+                        // Set direction consistently away from center
+                        animal.direction = angle;
+                        
+                        // Temporarily increase speed to escape
+                        animal.escaping = true;
+                        animal.originalSpeed = animal.originalSpeed || animal.speed;
+                        animal.speed = animal.originalSpeed * 2;
+                    }
+                } else if (animal.escaping) {
+                    // Reset speed when outside bounding box
+                    animal.speed = animal.originalSpeed || animal.speed;
+                    animal.escaping = false;
+                }
+            }
+        });
+    }
+
     function animateAnimals() {
+        detectPoses(); // Run pose detection
+        
         animals.forEach(animal => {
-            updateDirection(animal);
-            updatePosition(animal);
+            // Check if animal is actively tracking something
+            let isTracking = false;
+            
+            if (animal.trackingBehavior && window.poses.length > 0) {
+                const pose = window.poses[0];
+                
+                if (animal.trackingBehavior.type === 'nose') {
+                    const noseKeypoint = pose.keypoints.find(kp => kp.name === 'nose');
+                    isTracking = noseKeypoint && noseKeypoint.score > 0.3;
+                } else if (animal.trackingBehavior.type === 'raised_palm') {
+                    // Check both hands for raised palm
+                    const leftWrist = pose.keypoints.find(kp => kp.name === 'left_wrist');
+                    const leftElbow = pose.keypoints.find(kp => kp.name === 'left_elbow');
+                    const rightWrist = pose.keypoints.find(kp => kp.name === 'right_wrist');
+                    const rightElbow = pose.keypoints.find(kp => kp.name === 'right_elbow');
+                    
+                    const leftRaised = leftWrist && leftElbow && leftWrist.score > 0.3 && 
+                                      leftElbow.score > 0.3 && leftWrist.y <= leftElbow.y;
+                    const rightRaised = rightWrist && rightElbow && rightWrist.score > 0.3 && 
+                                       rightElbow.score > 0.3 && rightWrist.y <= rightElbow.y;
+                    
+                    isTracking = leftRaised || rightRaised;
+                }
+            }
+            
+            // Store tracking state for collision avoidance
+            animal.isCurrentlyTracking = isTracking;
+            
+            if (!isTracking) {
+                updateDirection(animal);
+            }
+            
+            avoidPeople(animal); // Make animals avoid detected people or track specific body parts
+            
+            if (!isTracking) {
+                updatePosition(animal);
+            }
+            
             updateSize(animal);
             rotateAnimal(animal);
-            checkEdgeAndTeleport(animal); // Check and teleport if near the edge
+            
+            if (!isTracking) {
+                checkEdgeAndTeleport(animal); // Check and teleport if near the edge
+            }
         });
 
         avoidCollision();
+        
+        // Draw poses if enabled
+        drawPoses();
 
         // if (Math.random() < 0.01) {
         //     const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
