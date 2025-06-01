@@ -215,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function () {
             rotateEvery: 3,
             reactionSpeed: 0.1,
             movementPattern: { type: 'oscillation', amplitude: 1, frequency: 0.05 }, // Oscillation pattern
-            trackingBehavior: { type: 'nose', offset: { x: 0, y: -200 } } // Track nose with offset
+            trackingBehavior: { type: 'nose', offset: { x: 0, y: -15 } } // Track nose with offset (15% of video height above)
         },
         {
             id: 'brouk_medium',
@@ -547,9 +547,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     const scaleX = video.offsetWidth / video.videoWidth;
                     const scaleY = video.offsetHeight / video.videoHeight;
                     
+                    // Calculate relative offset based on video size
+                    const relativeOffsetX = (animal.trackingBehavior.offset.x / 100) * video.offsetWidth;
+                    const relativeOffsetY = (animal.trackingBehavior.offset.y / 100) * video.offsetHeight;
+                    
                     // Target position with offset, scaled to match video display size
-                    const targetX = (noseKeypoint.x * scaleX) + video.offsetLeft - animal.element.offsetWidth / 2 + animal.trackingBehavior.offset.x;
-                    const targetY = (noseKeypoint.y * scaleY) + video.offsetTop + animal.trackingBehavior.offset.y;
+                    const targetX = (noseKeypoint.x * scaleX) + video.offsetLeft - animal.element.offsetWidth / 2 + relativeOffsetX;
+                    const targetY = (noseKeypoint.y * scaleY) + video.offsetTop + relativeOffsetY;
                     
                     // Smoothly move towards the target position
                     const moveSpeed = 0.15; // How quickly to follow (0-1)
@@ -591,9 +595,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     const scaleX = video.offsetWidth / video.videoWidth;
                     const scaleY = video.offsetHeight / video.videoHeight;
                     
+                    // Calculate relative offset based on video size
+                    const relativeOffsetX = (animal.trackingBehavior.offset.x / 100) * video.offsetWidth;
+                    const relativeOffsetY = (animal.trackingBehavior.offset.y / 100) * video.offsetHeight;
+                    
                     // Target position at the palm/wrist with offset, scaled to match video display size
-                    const targetX = (targetWrist.x * scaleX) + video.offsetLeft - animal.element.offsetWidth / 2 + animal.trackingBehavior.offset.x;
-                    const targetY = (targetWrist.y * scaleY) + video.offsetTop - animal.element.offsetHeight / 2 + animal.trackingBehavior.offset.y;
+                    const targetX = (targetWrist.x * scaleX) + video.offsetLeft - animal.element.offsetWidth / 2 + relativeOffsetX;
+                    const targetY = (targetWrist.y * scaleY) + video.offsetTop - animal.element.offsetHeight / 2 + relativeOffsetY;
                     
                     // Smoothly move towards the target position
                     const moveSpeed = 0.2; // Slightly faster for hand tracking
